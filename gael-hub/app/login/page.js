@@ -11,17 +11,23 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const res = await fetch("/api/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
-    });
-    setLoading(false);
-    if (res.ok) {
-      window.location.href = "/";
-    } else {
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        // Leave the button in its loading state — we're navigating away.
+        window.location.href = "/";
+        return;
+      }
       const data = await res.json().catch(() => ({}));
       setError(data.error || "Something went wrong");
+      setLoading(false);
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
+      setLoading(false);
     }
   }
 
