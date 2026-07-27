@@ -13,6 +13,12 @@ export function getSupabase() {
   }
   return createClient(url, key, {
     auth: { persistSession: false },
+    global: {
+      // Next.js patches global fetch and will happily serve build-time
+      // cached responses to database reads — which froze the hub's API at
+      // whatever the data looked like at deploy time. Live data, always.
+      fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),
+    },
   });
 }
 
