@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 
 const STAGES = [
-  { key: "to_start", label: "To Start", cls: "" },
-  { key: "in_progress", label: "In Progress", cls: "stage2" },
-  { key: "waiting", label: "Waiting On", cls: "stage3" },
-  { key: "done", label: "Done", cls: "stage4" },
+  { key: "idea", label: "Idea", cls: "" },
+  { key: "in_dev", label: "In Dev", cls: "stage2" },
+  { key: "review", label: "Review", cls: "stage3" },
+  { key: "live", label: "Live", cls: "stage4" },
 ];
 
 async function api(path, opts) {
@@ -27,13 +27,20 @@ export default function Home() {
   const [ideaNotes, setIdeaNotes] = useState("");
   const [ideaSource, setIdeaSource] = useState("");
   const [showIdeaForm, setShowIdeaForm] = useState(false);
+  const [error, setError] = useState("");
 
   async function loadAll() {
     setLoading(true);
-    const [t, i] = await Promise.all([api("/api/tasks"), api("/api/ideas")]);
-    setTasks(t.tasks);
-    setIdeas(i.ideas);
-    setLoading(false);
+    setError("");
+    try {
+      const [t, i] = await Promise.all([api("/api/tasks"), api("/api/ideas")]);
+      setTasks(t.tasks);
+      setIdeas(i.ideas);
+    } catch (err) {
+      setError(err.message || "Something went wrong loading your hub.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -45,7 +52,7 @@ export default function Home() {
     if (!taskTitle.trim()) return;
     await api("/api/tasks", {
       method: "POST",
-      body: JSON.stringify({ title: taskTitle, stage: "to_start" }),
+      body: JSON.stringify({ title: taskTitle, stage: "idea" }),
     });
     setTaskTitle("");
     loadAll();
@@ -84,12 +91,34 @@ export default function Home() {
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 60px" }}>
       <h1 style={{ fontSize: "1.6rem", margin: "0 0 4px" }}>My Work Hub</h1>
       <div style={{ color: "var(--muted)", fontSize: "0.95rem", marginBottom: 28 }}>
-        {loading ? "Loading..." : `${tasks.length} tasks · ${ideas.length} ideas`}
+        {loading ? "Loading..." : `${tasks.length} tasks Â· ${ideas.length} ideas`}
       </div>
+
+      {error && (
+        <div
+          style={{
+            background: "#fdecea",
+            border: "1px solid #f3b4ab",
+            color: "#8a2e22",
+            borderRadius: 8,
+            padding: "10px 14px",
+            marginBottom: 20,
+            fontSize: "0.9rem",
+          }}
+        >
+          Something went wrong: {error}
+          <button
+            onClick={loadAll}
+            style={{ marginLeft: 10, background: "none", border: "none", color: "#8a2e22", textDecoration: "underline", cursor: "pointer" }}
+          >
+            Try again
+          </button>
+        </div>
+      )}
 
       {/* TASKS */}
       <div style={{ marginBottom: 32 }}>
-        <div style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: 12 }}>✅ To-Do Pipeline</div>
+        <div style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: 12 }}>â To-Do Pipeline</div>
 
         <form onSubmit={addTask} style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           <input
@@ -130,7 +159,7 @@ export default function Home() {
                           onClick={() => moveTask(t.id, s.key)}
                           style={smallBtnStyle}
                         >
-                          → {s.label}
+                          â {s.label}
                         </button>
                       ))}
                       <button onClick={() => deleteTask(t.id)} style={{ ...smallBtnStyle, color: "#c0392b" }}>
@@ -147,7 +176,7 @@ export default function Home() {
 
       {/* IDEAS */}
       <div style={{ marginBottom: 32 }}>
-        <div style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: 12 }}>💡 Ideas Box</div>
+        <div style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: 12 }}>ð¡ Ideas Box</div>
 
         {!showIdeaForm ? (
           <button onClick={() => setShowIdeaForm(true)} style={buttonStyle}>+ Add an idea</button>
@@ -171,7 +200,7 @@ export default function Home() {
               {idea.notes && <div style={{ marginTop: 4, fontSize: "0.92rem", whiteSpace: "pre-wrap" }}>{idea.notes}</div>}
               <div style={{ marginTop: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ color: "var(--muted)", fontSize: "0.8rem" }}>
-                  {idea.source || "No source noted"} · {new Date(idea.created_at).toLocaleDateString()}
+                  {idea.source || "No source noted"} Â· {new Date(idea.created_at).toLocaleDateString()}
                 </div>
                 <button onClick={() => deleteIdea(idea.id)} style={{ ...smallBtnStyle, color: "#c0392b" }}>Delete</button>
               </div>
