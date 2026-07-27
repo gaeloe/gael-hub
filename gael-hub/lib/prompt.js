@@ -16,7 +16,7 @@ export function buildHandoffPrompt(task, recentLog, baseUrl) {
   );
   lines.push("");
   lines.push(`TASK: ${task.title}${task.project ? `  [${task.project}]` : ""}`);
-  lines.push(`STAGE: ${task.stage}`);
+  lines.push(`STAGE: ${task.stage} · PRIORITY: P${task.priority || 3} (1 = do first, 5 = someday)`);
   lines.push(`NEXT STEP: ${task.next_step || "(not recorded — infer it from the notes, then confirm with Gaël)"}`);
   if (task.notes) {
     lines.push(`NOTES: ${task.notes.slice(0, 700)}${task.notes.length > 700 ? "…" : ""}`);

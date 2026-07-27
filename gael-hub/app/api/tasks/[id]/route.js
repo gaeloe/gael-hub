@@ -42,6 +42,14 @@ export async function PATCH(request, { params }) {
     updates.autopilot = Boolean(body.autopilot);
   }
 
+  if (body.priority !== undefined) {
+    const priority = Number(body.priority);
+    if (!Number.isInteger(priority) || priority < 1 || priority > 5) {
+      return NextResponse.json({ error: "priority must be an integer 1–5" }, { status: 400 });
+    }
+    updates.priority = priority;
+  }
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }

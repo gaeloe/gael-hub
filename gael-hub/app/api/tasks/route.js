@@ -44,6 +44,14 @@ export async function POST(request) {
     }
   }
 
+  if (body.priority !== undefined) {
+    const priority = Number(body.priority);
+    if (!Number.isInteger(priority) || priority < 1 || priority > 5) {
+      return NextResponse.json({ error: "priority must be an integer 1–5" }, { status: 400 });
+    }
+    row.priority = priority;
+  }
+
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("tasks")
