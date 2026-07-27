@@ -15,7 +15,7 @@ export async function GET() {
 export async function POST(request) {
   const body = await request.json();
   const title = (body.title || "").trim();
-  const stage = body.stage || "to_start";
+  const stage = body.stage || "idea";
 
   if (!title) {
     return NextResponse.json({ error: "Title is required" }, { status: 400 });
