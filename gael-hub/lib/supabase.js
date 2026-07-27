@@ -15,3 +15,14 @@ export function getSupabase() {
     auth: { persistSession: false },
   });
 }
+
+// Translate "column does not exist" into something actionable: it means the
+// second-brain migration hasn't been applied to the database yet, so tell the
+// user exactly what to run instead of echoing a cryptic SQL error. Postgres
+// reports this as 42703 on reads; PostgREST reports it as PGRST204 on writes.
+export function friendlyDbError(error) {
+  if (error.code === "42703" || error.code === "PGRST204") {
+    return "The database is missing newer columns — run supabase-migrate-second-brain.sql in the Supabase SQL editor, then retry.";
+  }
+  return error.message;
+}

@@ -1,10 +1,17 @@
--- Run this once in Supabase: Project > SQL Editor > New query > paste this > Run
+-- Run this in Supabase: Project > SQL Editor > New query > paste this > Run.
+-- Safe to re-run: the tables are created only if missing and the seed below
+-- skips ideas that are already there.
 
 create table if not exists tasks (
   id uuid primary key default gen_random_uuid(),
   title text not null,
-  stage text not null default 'to_start',
-  created_at timestamptz not null default now()
+  stage text not null default 'idea'
+    check (stage in ('idea', 'in_dev', 'review', 'live')),
+  project text not null default '',
+  notes text not null default '',
+  next_step text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists ideas (
@@ -15,9 +22,11 @@ create table if not exists ideas (
   created_at timestamptz not null default now()
 );
 
--- Seed your existing ideas so nothing gets lost in the move.
+-- Seed the starting ideas so nothing gets lost in the move. Wrapped so that
+-- re-running this file doesn't insert a second copy of every idea.
 
-insert into ideas (title, notes, source) values
+insert into ideas (title, notes, source)
+select * from (values
 (
   'Reddit "buying intent" lead source — email people minutes after they publicly ask for your service',
   'Monitor 5-10 subreddits where our buyers hang out for posts like "anyone got recommendations for X", "alternative to [competitor]", "looking for a good X", "got burned by X - where do I go now". These are public, timestamped declarations of buying intent.
@@ -68,4 +77,5 @@ Action for us: run this checklist before shipping anything with user data or a d
 
 Suggested order: (1) restructure best existing pages into direct-answer/chunked format, (2) add schema + summaries + comparisons, (3) publish new comparison articles, (4) build backlinks and brand consistency.',
   'Article on optimizing content for AI search traffic, shared by Gaël, 26 Jul 2026 (references Google Cloud Discovery Engine signals - treat specifics as claims to verify)'
-);
+)) as seed(title, notes, source)
+where not exists (select 1 from ideas where ideas.title = seed.title);

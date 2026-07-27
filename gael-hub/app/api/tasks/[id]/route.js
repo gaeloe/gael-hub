@@ -1,23 +1,76 @@
 import { NextResponse } from "next/server";
-import { getSupabase } from "../../../../lib/supabase";
+import { getSupabase, friendlyDbError } from "../../../../lib/supabase";
+import { STAGE_KEYS, isValidStage } from "../../../../lib/stages";
 
 export async function PATCH(request, { params }) {
-  const body = await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const updates = {};
+
+  if (body.stage !== undefined) {
+    // Reject unknown stages rather than writing them. A task stored with a
+    // stage the UI doesn't render matches no column and vanishes from the hub.
+    if (!isValidStage(body.stage)) {
+      return NextResponse.json(
+        { error: `Unknown stage "${body.stage}". Must be one of: ${STAGE_KEYS.join(", ")}` },
+        { status: 400 }
+      );
+    }
+    updates.stage = body.stage;
+  }
+
+  if (body.title !== undefined) {
+    const title = String(body.title).trim();
+    if (!title) {
+      return NextResponse.json({ error: "Title cannot be empty" }, { status: 400 });
+    }
+    updates.title = title;
+  }
+
+  for (const key of ["project", "notes", "next_step"]) {
+    if (body[key] !== undefined) {
+      updates[key] = String(body[key]).trim();
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+  }
+
+  // Every edit refreshes the "last touched" timestamp that drives the
+  // "Where I left off" panel and its staleness colors.
+  updates.updated_at = new Date().toISOString();
+
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("tasks")
-    .update({ stage: body.stage })
+    .update(updates)
     .eq("id", params.id)
-    .select()
-    .single();
+    .select();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ task: data });
+  if (error) return NextResponse.json({ error: friendlyDbError(error) }, { status: 500 });
+  if (!data || data.length === 0) {
+    return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  }
+  return NextResponse.json({ task: data[0] });
 }
 
 export async function DELETE(request, { params }) {
   const supabase = getSupabase();
-  const { error } = await supabase.from("tasks").delete().eq("id", params.id);
+  const { data, error } = await supabase
+    .from("tasks")
+    .delete()
+    .eq("id", params.id)
+    .select();
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data || data.length === 0) {
+    return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  }
   return NextResponse.json({ ok: true });
 }

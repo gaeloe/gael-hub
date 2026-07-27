@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSupabase } from "../../../lib/supabase";
+import { getSupabase, friendlyDbError } from "../../../lib/supabase";
+import { DEFAULT_STAGE, STAGE_KEYS, isValidStage } from "../../../lib/stages";
 
 export async function GET() {
   const supabase = getSupabase();
@@ -13,21 +14,43 @@ export async function GET() {
 }
 
 export async function POST(request) {
-  const body = await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
   const title = (body.title || "").trim();
-  const stage = body.stage || "idea";
+  const stage = body.stage || DEFAULT_STAGE;
 
   if (!title) {
     return NextResponse.json({ error: "Title is required" }, { status: 400 });
   }
 
+  if (!isValidStage(stage)) {
+    return NextResponse.json(
+      { error: `Unknown stage "${stage}". Must be one of: ${STAGE_KEYS.join(", ")}` },
+      { status: 400 }
+    );
+  }
+
+  const row = { title, stage };
+  // Second-brain fields — only sent when provided, so a plain add still works
+  // even if the database migration hasn't been applied yet.
+  for (const key of ["project", "notes", "next_step"]) {
+    if (typeof body[key] === "string" && body[key].trim()) {
+      row[key] = body[key].trim();
+    }
+  }
+
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("tasks")
-    .insert([{ title, stage }])
+    .insert([row])
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: friendlyDbError(error) }, { status: 500 });
   return NextResponse.json({ task: data });
 }
