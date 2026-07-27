@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { STAGES, DEFAULT_STAGE } from "../lib/stages";
+import { PROJECTS } from "../lib/projects";
 
 async function api(path, opts) {
   const res = await fetch(path, {
@@ -316,7 +317,9 @@ export default function Home() {
   }
 
   // ---- derived views ----
-  const projects = [...new Set(tasks.map((t) => t.project).filter(Boolean))].sort();
+  // Tabs are the canonical project list — never derived from data, so a
+  // mistyped or invented project can't create a tab.
+  const projects = PROJECTS;
   const inTab = (t) => tab === "All" || t.project === tab;
   const visibleTasks = tasks.filter(inTab);
 
@@ -409,7 +412,16 @@ export default function Home() {
     <form onSubmit={saveEdit} style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
       <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="Title" style={smallInputStyle} />
       <div style={{ display: "flex", gap: 6 }}>
-        <input value={draft.project} onChange={(e) => setDraft({ ...draft, project: e.target.value })} placeholder="Project" style={{ ...smallInputStyle, flex: 2 }} />
+        <select
+          value={draft.project}
+          onChange={(e) => setDraft({ ...draft, project: e.target.value })}
+          style={{ ...smallInputStyle, flex: 2 }}
+        >
+          <option value="">No project</option>
+          {PROJECTS.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
         <select
           value={draft.priority}
           onChange={(e) => setDraft({ ...draft, priority: Number(e.target.value) })}
@@ -582,12 +594,16 @@ export default function Home() {
               style={{ ...inputStyle, flex: "2 1 200px" }}
             />
             {tab === "All" && (
-              <input
+              <select
                 value={taskProject}
                 onChange={(e) => setTaskProject(e.target.value)}
-                placeholder="Project (optional)"
-                style={{ ...inputStyle, flex: "1 1 120px" }}
-              />
+                style={{ ...inputStyle, flex: "1 1 140px" }}
+              >
+                <option value="">No project</option>
+                {PROJECTS.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
             )}
             <button type="submit" disabled={busy} className="btn" style={busy ? disabledBtnStyle : buttonStyle}>Add</button>
           </form>

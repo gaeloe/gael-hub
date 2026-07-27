@@ -25,6 +25,7 @@ claude -p "Daily hub scan (headless, no user present). Reconcile Gaël's work hu
 3. For each work thread in the digest with meaningful new activity NOT already reflected in the hub's tasks/recent_log:
    - If it matches an existing task: POST https://gael-hub.vercel.app/api/handoff with JSON {\"task_id\": ..., \"summary\": one line of what happened, \"next_step\": the next concrete action if the session made it clear, \"stage\": only if it clearly changed, \"source\": \"scan\"} and header x-hub-key.
    - If it's a genuinely new work thread: create a task first via POST https://gael-hub.vercel.app/api/tasks (title, project, notes, next_step, stage one of idea|in_dev|review|live, priority 1-5), then log the handoff.
+   - project MUST be exactly one of: Be North, Move and Stay, North Leads, North Sight, North Voice, Ocean Wake — or empty if none fits. Map folder names to these (Code-BeNorth -> Be North, Moveandstay -> Move and Stay, north-leads -> North Leads, north-site -> North Sight, Northvoice and GrowthPilot -> North Voice, OceanWakeClaude -> Ocean Wake). NEVER invent a new project; the API rejects unknown ones.
 4. Deduplicate hard: skip anything whose substance already appears in recent_log or the task's notes. An empty scan is a fine outcome — do not invent updates.
 5. Ignore the gael-hub project's own sessions and pure housekeeping sessions (claude doctor, version cleanup).
 6. Finish by printing a 3-6 line plain-English report of what you updated (or 'nothing new').

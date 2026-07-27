@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabase, friendlyDbError } from "../../../lib/supabase";
 import { DEFAULT_STAGE, STAGE_KEYS, isValidStage } from "../../../lib/stages";
+import { PROJECTS, isValidProject } from "../../../lib/projects";
 
 export async function GET() {
   const supabase = getSupabase();
@@ -42,6 +43,13 @@ export async function POST(request) {
     if (typeof body[key] === "string" && body[key].trim()) {
       row[key] = body[key].trim();
     }
+  }
+
+  if (row.project && !isValidProject(row.project)) {
+    return NextResponse.json(
+      { error: `Unknown project "${row.project}". Must be one of: ${PROJECTS.join(", ")} (or empty)` },
+      { status: 400 }
+    );
   }
 
   if (body.priority !== undefined) {

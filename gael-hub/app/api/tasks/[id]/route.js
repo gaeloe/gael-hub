@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabase, friendlyDbError } from "../../../../lib/supabase";
 import { STAGE_KEYS, isValidStage } from "../../../../lib/stages";
+import { PROJECTS, isValidProject } from "../../../../lib/projects";
 
 export async function PATCH(request, { params }) {
   let body;
@@ -36,6 +37,13 @@ export async function PATCH(request, { params }) {
     if (body[key] !== undefined) {
       updates[key] = String(body[key]).trim();
     }
+  }
+
+  if (updates.project !== undefined && !isValidProject(updates.project)) {
+    return NextResponse.json(
+      { error: `Unknown project "${updates.project}". Must be one of: ${PROJECTS.join(", ")} (or empty)` },
+      { status: 400 }
+    );
   }
 
   if (body.autopilot !== undefined) {
