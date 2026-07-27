@@ -10,8 +10,21 @@ create table if not exists tasks (
   project text not null default '',
   notes text not null default '',
   next_step text not null default '',
+  autopilot boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+-- One row per work session / handoff (hub UI, pasted HANDOFF block, a Claude
+-- session calling /api/handoff, or the autopilot routine).
+create table if not exists worklog (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid references tasks(id) on delete set null,
+  summary text not null,
+  details text not null default '',
+  next_step text not null default '',
+  source text not null default '',
+  created_at timestamptz not null default now()
 );
 
 create table if not exists ideas (

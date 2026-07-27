@@ -10,6 +10,14 @@ export function expectedToken() {
 }
 
 export function isAuthedRequest(request) {
+  // Browser sessions authenticate with the login cookie.
   const cookie = request.cookies.get(AUTH_COOKIE)?.value;
-  return cookie && cookie === expectedToken();
+  if (cookie && cookie === expectedToken()) return true;
+
+  // Claude sessions (or any script) authenticate with the hub key header.
+  // Same secret as the login password — one key to remember, and rotating
+  // HUB_PASSWORD rotates both doors at once.
+  const key = request.headers.get("x-hub-key");
+  const password = process.env.HUB_PASSWORD || "";
+  return Boolean(password) && key === password;
 }

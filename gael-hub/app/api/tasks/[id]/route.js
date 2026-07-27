@@ -38,6 +38,10 @@ export async function PATCH(request, { params }) {
     }
   }
 
+  if (body.autopilot !== undefined) {
+    updates.autopilot = Boolean(body.autopilot);
+  }
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
