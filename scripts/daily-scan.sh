@@ -25,9 +25,9 @@ claude -p "Daily hub scan (headless, no user present). Reconcile Gaël's work hu
 3. For each work thread in the digest with meaningful new activity NOT already reflected in the hub's tasks/recent_log:
    - If it matches an existing task: POST https://gael-hub.vercel.app/api/handoff with JSON {\"task_id\": ..., \"summary\": one line of what happened, \"next_step\": the next concrete action if the session made it clear, \"stage\": only if it clearly changed, \"source\": \"scan\"} and header x-hub-key.
    - If it's a genuinely new work thread: create a task first via POST https://gael-hub.vercel.app/api/tasks (title, project, notes, next_step, stage one of idea|in_dev|review|live, priority 1-5), then log the handoff.
-   - project MUST be exactly one of: Be North, Move and Stay, North Leads, North Sight, North Voice, Ocean Wake — or empty if none fits. Map folder names to these (Code-BeNorth -> Be North, Moveandstay -> Move and Stay, north-leads -> North Leads, north-site -> North Sight, Northvoice and GrowthPilot -> North Voice, OceanWakeClaude -> Ocean Wake). NEVER invent a new project; the API rejects unknown ones.
+   - project MUST be exactly one of: Ocean, North Site, North Voice, North Leads, Be North, Moveandstay, My Hub — or empty if none fits. Map folder names to these (OceanWakeClaude -> Ocean, north-site -> North Site, Northvoice and GrowthPilot -> North Voice, north-leads -> North Leads, Code-BeNorth -> Be North, Moveandstay -> Moveandstay, Downloads-gael-hub -> My Hub). NEVER invent a new project; the API rejects unknown ones.
 4. Deduplicate hard: skip anything whose substance already appears in recent_log or the task's notes. An empty scan is a fine outcome — do not invent updates.
-5. Ignore the gael-hub project's own sessions and pure housekeeping sessions (claude doctor, version cleanup).
+5. Ignore pure housekeeping sessions (claude doctor, version cleanup) and the daily scan's own runs.
 6. Finish by printing a 3-6 line plain-English report of what you updated (or 'nothing new').
 
 Rules: only curl calls to gael-hub.vercel.app; never delete anything; keep summaries factual with dates." \

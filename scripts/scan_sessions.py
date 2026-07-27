@@ -7,7 +7,7 @@ WINDOW_H = float(sys.argv[1]) if len(sys.argv) > 1 else 36.0
 CUTOFF = time.time() - WINDOW_H * 3600
 
 ROOT = os.path.expanduser("~/.claude/projects")
-SKIP_DIRS = {"-Users-Gaeloe-Downloads-gael-hub"}  # this session — already in the hub
+SKIP_DIRS = set()  # My Hub is a tracked project; housekeeping is filtered by the scan prompt
 
 def text_of(content):
     if isinstance(content, str):
