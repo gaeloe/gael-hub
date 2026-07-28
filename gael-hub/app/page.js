@@ -32,6 +32,21 @@ function ageColor(iso) {
 
 const lastTouched = (t) => t.updated_at || t.created_at;
 
+// When will Claude next pick up its desk? Pickups run hourly at :32 from
+// 07:32 to 20:32 local.
+function nextPickupLabel() {
+  const t = new Date();
+  if (t.getMinutes() >= 32) t.setHours(t.getHours() + 1);
+  t.setMinutes(32, 0, 0);
+  if (t.getHours() > 20) {
+    t.setDate(t.getDate() + 1);
+    t.setHours(7, 32, 0, 0);
+  } else if (t.getHours() < 7) {
+    t.setHours(7, 32, 0, 0);
+  }
+  return t.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
 // Attention score, 0–100: what deserves your eyes first. Transparent math —
 // priority is the big lever, neglect and "waiting on you" add pressure.
 function attentionScore(t) {
@@ -133,14 +148,16 @@ export default function Home() {
     try {
       const savedTab = localStorage.getItem("hub.tab");
       if (savedTab) setTab(savedTab);
-      const savedOpen = localStorage.getItem("hub.sections");
+      // v2: fresh defaults after the simplification — desk & focus up top,
+      // everything else starts folded.
+      const savedOpen = localStorage.getItem("hub.sections.v2");
       if (savedOpen) setOpen(JSON.parse(savedOpen));
     } catch {}
   }, []);
   useEffect(() => {
     try {
       localStorage.setItem("hub.tab", tab);
-      localStorage.setItem("hub.sections", JSON.stringify(open));
+      localStorage.setItem("hub.sections.v2", JSON.stringify(open));
     } catch {}
   }, [tab, open]);
 
@@ -534,26 +551,6 @@ export default function Home() {
         </form>
       )}
 
-      {/* HOW THIS WORKS */}
-      {!loading && (
-        <Section id="help" title="❓ How this works" defaultOpen={true} open={open} setOpen={setOpen}>
-          <div className="card" style={{ padding: "14px 18px", marginTop: 6, fontSize: "0.9rem", lineHeight: 1.65 }}>
-            <div style={{ marginBottom: 8 }}>
-              <strong>The idea:</strong> you decide what matters — Claude does the work — this hub shows you what happened.
-            </div>
-            <div><strong>🎯 Focus</strong> — what deserves your attention first. The number is an attention score: priority + how long untouched + whether it's waiting on you.</div>
-            <div><strong>P1–P5</strong> — priority. P1 = do first, P5 = someday. Tap the pill to change it.</div>
-            <div><strong>▶ Work on it with Claude</strong> — opens a Claude session that's already briefed on the task. You two work together.</div>
-            <div><strong>🤖 Give to Claude</strong> — Claude does it <em>alone</em>. It checks its desk every hour through the day, does the work (research, drafts, plans, code), and files the result below. You just read it.</div>
-            <div><strong>🔁 Loop</strong> — Claude re-does it every morning, forever. For standing jobs like "check the pilot posts" or "watch for new leads". Write the standing instructions in the task's notes.</div>
-            <div><strong>📝 Log / 📥 Paste handoff</strong> — for work that happened elsewhere: jot it yourself, or paste the HANDOFF block a phone Claude session prints.</div>
-            <div style={{ marginTop: 8, color: "var(--muted)" }}>
-              The hub also updates itself: every morning it scans your Claude sessions from the previous day and files what happened. Collapse this box when you don't need it — it stays collapsed.
-            </div>
-          </div>
-        </Section>
-      )}
-
       {/* CLAUDE'S DESK — work being done for you */}
       {!loading && (
         <Section
@@ -572,14 +569,16 @@ export default function Home() {
             ) : (
               <>
                 <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginBottom: 6 }}>
-                  In Claude's queue — next pickup within the hour (hourly ~7:30–20:30):
+                  On Claude's desk — ⏳ next pickup at <strong>{nextPickupLabel()}</strong>:
                 </div>
                 {visibleQueued.map((t) => (
                   <div key={t.id} style={{ padding: "5px 0", fontSize: "0.9rem", display: "flex", gap: 8, alignItems: "baseline" }}>
                     <span>{t.is_loop ? "🔁" : "🤖"}</span>
                     <span style={{ fontWeight: 600 }}>{t.title}</span>
                     {t.project && <span style={chipStyle}>{t.project}</span>}
-                    {t.is_loop && <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>daily loop</span>}
+                    <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                      {t.is_loop ? "daily loop" : "one-off"}
+                    </span>
                   </div>
                 ))}
               </>
@@ -668,35 +667,17 @@ export default function Home() {
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* REST OF IN-FLIGHT */}
-      {!loading && restActive.length > 0 && (
-        <Section id="active" title="📍 Also in flight" count={restActive.length} defaultOpen={true} open={open} setOpen={setOpen}>
-          {restActive.map((t) => (
-            <div key={t.id} className="card card-hover" style={{ padding: "10px 14px", marginBottom: 8, borderLeft: `4px solid var(--p${t.priority || 3})` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-                <div style={{ fontWeight: 600, fontSize: "0.93rem" }}>
-                  {t.title}
-                  {t.project && <span style={chipStyle}>{t.project}</span>}
-                </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  {prioPill(t)}
-                  <span style={{ color: ageColor(lastTouched(t)), fontSize: "0.75rem" }}>{timeAgo(lastTouched(t))}</span>
-                </div>
-              </div>
-              {t.next_step && <div style={{ marginTop: 2, fontSize: "0.85rem", color: "var(--muted)" }}>→ {t.next_step}</div>}
-              <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>{claudeButtons(t)}</div>
-              {logForm(t)}
+          {restActive.length > 0 && (
+            <div style={{ fontSize: "0.83rem", color: "var(--muted)", padding: "2px 4px" }}>
+              Also in flight: {restActive.map((t) => t.title).join(" · ")} — see Pipeline below.
             </div>
-          ))}
-        </Section>
+          )}
+        </div>
       )}
 
       {/* PIPELINE BOARD */}
       {!loading && (
-        <Section id="pipeline" title="✅ Pipeline" count={visibleTasks.length} defaultOpen={true} open={open} setOpen={setOpen}>
+        <Section id="pipeline" title="✅ Pipeline — all tasks" count={visibleTasks.length} defaultOpen={false} open={open} setOpen={setOpen}>
           <form onSubmit={addTask} style={{ display: "flex", gap: 8, margin: "10px 0 16px", flexWrap: "wrap" }}>
             <input
               value={taskTitle}
@@ -855,6 +836,27 @@ export default function Home() {
                 </div>
               </div>
             ))}
+          </div>
+        </Section>
+      )}
+
+      {/* HOW THIS WORKS */}
+      {!loading && (
+        <Section id="help" title="❓ How this works" defaultOpen={false} open={open} setOpen={setOpen}>
+          <div className="card" style={{ padding: "14px 18px", marginTop: 6, fontSize: "0.9rem", lineHeight: 1.65 }}>
+            <div style={{ marginBottom: 8 }}>
+              <strong>The idea:</strong> you decide what matters — Claude does the work — this hub shows you what happened.
+            </div>
+            <div><strong>🤖 Claude's desk</strong> — the work happening for you: what's queued (with the next pickup time) and what Claude delivered. This is the panel to watch.</div>
+            <div><strong>🎯 Focus</strong> — what deserves <em>your</em> attention first. The number is an attention score: priority + how long untouched + whether it's waiting on you.</div>
+            <div><strong>P1–P5</strong> — priority. P1 = do first, P5 = someday. Tap the pill to change it.</div>
+            <div><strong>▶ Work on it with Claude</strong> — opens a Claude session that's already briefed on the task. You two work together.</div>
+            <div><strong>🤖 Give to Claude</strong> — Claude does it <em>alone</em> at the next hourly pickup and files the result on its desk.</div>
+            <div><strong>🔁 Loop</strong> — Claude re-does it every morning, forever. Standing instructions live in the task's notes.</div>
+            <div><strong>📝 Log / 📥 Paste handoff</strong> — for work that happened elsewhere: jot it yourself, or paste the HANDOFF block a phone Claude session prints.</div>
+            <div style={{ marginTop: 8, color: "var(--muted)" }}>
+              The hub also updates itself: every morning it scans the previous day's Claude sessions and files what happened.
+            </div>
           </div>
         </Section>
       )}
