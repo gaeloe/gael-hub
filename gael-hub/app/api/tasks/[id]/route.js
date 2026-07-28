@@ -50,6 +50,10 @@ export async function PATCH(request, { params }) {
     updates.autopilot = Boolean(body.autopilot);
   }
 
+  if (body.is_loop !== undefined) {
+    updates.is_loop = Boolean(body.is_loop);
+  }
+
   if (body.priority !== undefined) {
     const priority = Number(body.priority);
     if (!Number.isInteger(priority) || priority < 1 || priority > 5) {

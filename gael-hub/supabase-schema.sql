@@ -12,6 +12,7 @@ create table if not exists tasks (
   next_step text not null default '',
   autopilot boolean not null default false,
   priority int not null default 3,
+  is_loop boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

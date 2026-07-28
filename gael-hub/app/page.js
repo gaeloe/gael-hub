@@ -214,12 +214,28 @@ export default function Home() {
     await mutate(async () => {
       await api(`/api/tasks/${t.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ autopilot: !t.autopilot }),
+        body: JSON.stringify({ autopilot: !t.autopilot, ...(t.autopilot ? { is_loop: false } : {}) }),
       });
       setNotice(
         t.autopilot
-          ? "Removed from the Claude autopilot queue."
-          : "Queued for Claude — autopilot picks this up on its next run."
+          ? "Taken off Claude's desk."
+          : "On Claude's desk — Claude works its queue every hour through the day and files the result here."
+      );
+    });
+  }
+
+  async function toggleLoop(t) {
+    await mutate(async () => {
+      await api(`/api/tasks/${t.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(
+          t.is_loop ? { is_loop: false, autopilot: false } : { is_loop: true, autopilot: true }
+        ),
+      });
+      setNotice(
+        t.is_loop
+          ? "Loop stopped."
+          : "Loop started — Claude re-does this every morning and reports here. Put the standing instructions in the task's notes."
       );
     });
   }
@@ -335,6 +351,11 @@ export default function Home() {
   const focus = active.slice(0, 3);
   const restActive = active.slice(3);
   const queued = tasks.filter((t) => t.autopilot);
+  const visibleQueued = visibleTasks.filter((t) => t.autopilot);
+  // What Claude delivered on its own lately — autopilot runs and morning scans.
+  const delivered = visibleLog
+    .filter((e) => e.source === "autopilot" || e.source === "scan")
+    .slice(0, 10);
 
   const prioPill = (t) => (
     <button
@@ -355,23 +376,33 @@ export default function Home() {
         rel="noreferrer"
         className="btn-small"
         style={{ ...smallBtnStyle, background: "var(--accent)", color: "#fff", textDecoration: "none", display: "inline-block", border: "1px solid var(--accent)" }}
+        title="Open a Claude session that already knows everything about this task — you work on it together"
       >
-        ▶ Continue in Claude
+        ▶ Work on it with Claude
       </a>
-      <button onClick={() => copyPrompt(t)} disabled={busy} className="btn-small" style={smallBtnStyle} title="Copy the handoff prompt for any Claude session">
-        ⧉ Prompt
-      </button>
-      <button onClick={() => startLog(t)} disabled={busy} className="btn-small" style={smallBtnStyle}>
-        📝 Log
-      </button>
       <button
         onClick={() => toggleAutopilot(t)}
         disabled={busy}
         className="btn-small"
-        style={{ ...smallBtnStyle, ...(t.autopilot ? { background: "#3b3a56", color: "#fff", borderColor: "#3b3a56" } : {}) }}
-        title="Queue for the morning Claude autopilot"
+        style={{ ...smallBtnStyle, ...(t.autopilot && !t.is_loop ? { background: "#3b3a56", color: "#fff", borderColor: "#3b3a56" } : {}) }}
+        title="Claude does this alone (hourly pickups through the day) and files the result in the hub"
       >
-        🤖 {t.autopilot ? "Queued" : "Autopilot"}
+        🤖 {t.autopilot && !t.is_loop ? "On Claude's desk" : "Give to Claude"}
+      </button>
+      <button
+        onClick={() => toggleLoop(t)}
+        disabled={busy}
+        className="btn-small"
+        style={{ ...smallBtnStyle, ...(t.is_loop ? { background: "var(--stage3)", color: "#fff", borderColor: "var(--stage3)" } : {}) }}
+        title="Claude re-does this every morning, forever — a standing job. Its instructions live in the task's notes."
+      >
+        🔁 {t.is_loop ? "Looping daily" : "Loop"}
+      </button>
+      <button onClick={() => startLog(t)} disabled={busy} className="btn-small" style={smallBtnStyle} title="Jot down what happened yourself">
+        📝 Log
+      </button>
+      <button onClick={() => copyPrompt(t)} disabled={busy} className="btn-small" style={smallBtnStyle} title="Copy the briefing prompt to paste into any Claude session yourself">
+        ⧉ Prompt
       </button>
     </>
   );
@@ -501,6 +532,86 @@ export default function Home() {
             <button type="button" onClick={() => setShowPaste(false)} className="btn-small" style={smallBtnStyle}>Cancel</button>
           </div>
         </form>
+      )}
+
+      {/* HOW THIS WORKS */}
+      {!loading && (
+        <Section id="help" title="❓ How this works" defaultOpen={true} open={open} setOpen={setOpen}>
+          <div className="card" style={{ padding: "14px 18px", marginTop: 6, fontSize: "0.9rem", lineHeight: 1.65 }}>
+            <div style={{ marginBottom: 8 }}>
+              <strong>The idea:</strong> you decide what matters — Claude does the work — this hub shows you what happened.
+            </div>
+            <div><strong>🎯 Focus</strong> — what deserves your attention first. The number is an attention score: priority + how long untouched + whether it's waiting on you.</div>
+            <div><strong>P1–P5</strong> — priority. P1 = do first, P5 = someday. Tap the pill to change it.</div>
+            <div><strong>▶ Work on it with Claude</strong> — opens a Claude session that's already briefed on the task. You two work together.</div>
+            <div><strong>🤖 Give to Claude</strong> — Claude does it <em>alone</em>. It checks its desk every hour through the day, does the work (research, drafts, plans, code), and files the result below. You just read it.</div>
+            <div><strong>🔁 Loop</strong> — Claude re-does it every morning, forever. For standing jobs like "check the pilot posts" or "watch for new leads". Write the standing instructions in the task's notes.</div>
+            <div><strong>📝 Log / 📥 Paste handoff</strong> — for work that happened elsewhere: jot it yourself, or paste the HANDOFF block a phone Claude session prints.</div>
+            <div style={{ marginTop: 8, color: "var(--muted)" }}>
+              The hub also updates itself: every morning it scans your Claude sessions from the previous day and files what happened. Collapse this box when you don't need it — it stays collapsed.
+            </div>
+          </div>
+        </Section>
+      )}
+
+      {/* CLAUDE'S DESK — work being done for you */}
+      {!loading && (
+        <Section
+          id="desk"
+          title="🤖 Claude's desk"
+          count={visibleQueued.length}
+          defaultOpen={true}
+          open={open}
+          setOpen={setOpen}
+        >
+          <div className="card" style={{ padding: "12px 16px", marginTop: 6, marginBottom: 10 }}>
+            {visibleQueued.length === 0 ? (
+              <div style={{ color: "var(--muted)", fontSize: "0.88rem" }}>
+                Nothing on Claude's desk{tab !== "All" ? ` for ${tab}` : ""}. Tap <strong>🤖 Give to Claude</strong> on any task and the work gets done for you — pickups run hourly from ~7:30 to ~20:30.
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginBottom: 6 }}>
+                  In Claude's queue — next pickup within the hour (hourly ~7:30–20:30):
+                </div>
+                {visibleQueued.map((t) => (
+                  <div key={t.id} style={{ padding: "5px 0", fontSize: "0.9rem", display: "flex", gap: 8, alignItems: "baseline" }}>
+                    <span>{t.is_loop ? "🔁" : "🤖"}</span>
+                    <span style={{ fontWeight: 600 }}>{t.title}</span>
+                    {t.project && <span style={chipStyle}>{t.project}</span>}
+                    {t.is_loop && <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>daily loop</span>}
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+          {delivered.length > 0 && (
+            <div className="card" style={{ padding: "12px 16px" }}>
+              <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginBottom: 6 }}>
+                Recently delivered by Claude:
+              </div>
+              {delivered.map((e) => (
+                <div key={e.id} style={{ padding: "6px 0", borderBottom: "1px dashed var(--border)", fontSize: "0.88rem" }}>
+                  <div>
+                    <span style={{ color: "var(--muted)", fontSize: "0.78rem" }}>
+                      {new Date(e.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })} ·{" "}
+                    </span>
+                    {e.tasks?.title && <strong>{e.tasks.title}: </strong>}
+                    {e.summary}
+                  </div>
+                  {e.details && (
+                    <details style={{ marginTop: 2 }}>
+                      <summary style={{ cursor: "pointer", color: "var(--accent)", fontSize: "0.83rem" }}>
+                        read the deliverable
+                      </summary>
+                      <div style={{ whiteSpace: "pre-wrap", fontSize: "0.87rem", marginTop: 4 }}>{e.details}</div>
+                    </details>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
       )}
 
       {/* FOCUS — top attention scores, always visible */}

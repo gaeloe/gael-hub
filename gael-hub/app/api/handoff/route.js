@@ -71,8 +71,10 @@ export async function POST(request) {
     const updates = { updated_at: new Date().toISOString() };
     if (body.next_step !== undefined) updates.next_step = String(body.next_step).trim();
     if (body.stage) updates.stage = body.stage;
-    // A completed handoff means the autopilot request (if any) is served.
-    if (task.autopilot) updates.autopilot = false;
+    // A completed handoff means the autopilot request (if any) is served —
+    // unless this is a loop: loops stay queued, a handoff only closes one
+    // iteration of the standing job.
+    if (task.autopilot && !task.is_loop) updates.autopilot = false;
     const { data, error } = await supabase
       .from("tasks")
       .update(updates)
