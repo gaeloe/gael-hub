@@ -25,7 +25,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 AUTHORIZE_URL = "https://cloud.ouraring.com/oauth/authorize"
 TOKEN_URL = "https://cloud.ouraring.com/oauth/token"
@@ -210,7 +210,7 @@ def cmd_summary(days=7):
 
     hr = _get("heartrate", {
         "start_datetime": datetime.combine(start, datetime.min.time()).isoformat() + "Z",
-        "end_datetime": datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+        "end_datetime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     })
     bpm = [h["bpm"] for h in hr if h.get("bpm")]
 
