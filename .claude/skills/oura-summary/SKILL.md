@@ -33,3 +33,34 @@ The Oura login used by that task is stored privately on that page
 (`data/users/me`, doc `oura_auth`, readable only by Gaël's account).
 `python3 scripts/oura.py export 30 <file>` makes the data file;
 `python3 scripts/oura.py tokens-in <file>` loads a saved login.
+
+## Weekly run (Sunday scheduled task)
+
+Run from the gael-hub checkout on branch `claude/bold-galileo-9fbhhl`
+(`git pull origin claude/bold-galileo-9fbhhl` first). D = https://claude.ai/artifact/Gtvkabnx2xhJkyLj5KLR4e,
+S = your scratchpad directory. Never print, log or commit token values.
+
+1. Restore the login: ArtifactData `get`, url D, collection `data/users/me`,
+   doc `oura_auth`, `out_dir` S/auth (don't read it into the chat). Note its version.
+   `python3 scripts/oura.py tokens-in <saved file>`, then delete S/auth.
+   (Skip if `python3 scripts/oura.py status` already says Connected.)
+2. `python3 scripts/oura.py export 30 S/oura-30d.json`
+3. Save the login back right away (refresh tokens are single-use): ArtifactData
+   `set`, url D, collection `data/users/me`, doc `oura_auth`,
+   `file_path` = absolute path of ~/.config/oura/tokens.json, `if_version` from step 1
+   (get the doc first if you skipped step 1).
+4. Upload S/oura-30d.json: Artifact publish, url D, `asset: true`. ArtifactData
+   `get` `datasets`/`oura`, then `update` it (if_version) with
+   `source: {kind: "file", url: <new /_blob url as returned>, name: "oura-30d.json", format: "json"}`,
+   `updated: {at: <now UTC ISO>, by: "Claude, Oura export"}`, `edit: {via: "claude", at: <now>}`.
+   Then delete the old blob (Artifact `delete`, url D, path = old blob id). Don't touch the page.
+5. `python3 scripts/oura.py summary 7` and `summary 30`. Write 4-6 plain-English
+   bullets: last 7 days vs the 14/30-day picture (sleep score and hours,
+   readiness, steps, resting heart rate/HRV), best and toughest day, days with
+   no data, one or two practical tips, and the link D.
+6. Send it to Gaël's phone with PushNotification (a 1-2 line version + "full summary in Claude").
+
+If the login is missing or NEED_LOGIN appears: `python3 scripts/oura.py login 054090ab-bd2b-4246-bfcf-88d9d7768d97`,
+push-notify Gaël that Oura needs a 30-second re-approval, and in the reply give the link
+and ask them to paste back the address of the page that won't load. Then `connect` and continue from step 2
+(create the `oura_auth` doc without if_version if it doesn't exist).
