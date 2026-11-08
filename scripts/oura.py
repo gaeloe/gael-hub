@@ -302,8 +302,8 @@ def cmd_summary(days=7):
     best = max((x for x in rows if x["readiness"] is not None), key=lambda x: x["readiness"], default=None)
     worst = min((x for x in rows if x["readiness"] is not None), key=lambda x: x["readiness"], default=None)
     if best and worst and best is not worst:
-        print(f"- Best day: {datetime.fromisoformat(best['day']):%A} (readiness {best['readiness']}). "
-              f"Toughest: {datetime.fromisoformat(worst['day']):%A} (readiness {worst['readiness']}).")
+        print(f"- Best day: {datetime.fromisoformat(best['day']):%a %d %b} (readiness {best['readiness']}). "
+              f"Toughest: {datetime.fromisoformat(worst['day']):%a %d %b} (readiness {worst['readiness']}).")
     hot = [x for x in rows if x["temp_dev"] is not None and x["temp_dev"] >= 0.5]
     if hot:
         print(f"- Body temperature ran higher than usual on {len(hot)} day(s) - worth watching.")
