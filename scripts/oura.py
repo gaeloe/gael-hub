@@ -7,6 +7,8 @@ Usage:
   python3 scripts/oura.py connect '<URL>'       # paste the localhost address you landed on
   python3 scripts/oura.py summary [days]        # default 7 days
   python3 scripts/oura.py status                # is Oura connected?
+  python3 scripts/oura.py export [days] [file]  # daily rows as JSON (default 30 days)
+  python3 scripts/oura.py tokens-in <file>      # load the login saved on the dashboard
 
 Where secrets live (never in this repo):
   * Oura Client ID + Client Secret: saved as a network secret on the cloud
@@ -190,8 +192,14 @@ def _avg(vals):
     return round(sum(vals) / len(vals)) if vals else None
 
 
-def cmd_summary(days=7):
-    end = date.today()
+LOCAL_TZ = "Asia/Bangkok"  # Gael's time zone (Phuket); Oura "days" are local days.
+
+
+def _collect(days):
+    """One row per day for the last `days` days (oldest first)."""
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo(LOCAL_TZ)
+    end = datetime.now(tz).date()
     start = end - timedelta(days=days - 1)
     rng = {"start_date": start.isoformat(), "end_date": (end + timedelta(days=1)).isoformat()}
 
@@ -199,36 +207,80 @@ def cmd_summary(days=7):
     readiness = {d["day"]: d for d in _get("daily_readiness", rng)}
     activity = {d["day"]: d for d in _get("daily_activity", rng)}
 
-    # Main sleep of each night (longest "long_sleep" period).
+    # Main sleep of each night = the longest sleep period that day.
     nights = {}
     for s in _get("sleep", rng):
-        if s.get("type") not in ("long_sleep", None):
+        if s.get("type") == "deleted":
             continue
         cur = nights.get(s["day"])
         if not cur or (s.get("total_sleep_duration") or 0) > (cur.get("total_sleep_duration") or 0):
             nights[s["day"]] = s
 
-    hr = _get("heartrate", {
-        "start_datetime": datetime.combine(start, datetime.min.time()).isoformat() + "Z",
-        "end_datetime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-    })
-    bpm = [h["bpm"] for h in hr if h.get("bpm")]
+    # Heart-rate samples, averaged per local day (Oura allows at most 30 days per call).
+    hr_by_day = {}
+    chunk_start = datetime.combine(start, datetime.min.time(), tz)
+    final = datetime.now(timezone.utc)
+    while chunk_start < final:
+        chunk_end = min(chunk_start + timedelta(days=29), final)
+        for h in _get("heartrate", {
+            "start_datetime": chunk_start.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "end_datetime": chunk_end.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }):
+            if h.get("bpm"):
+                d = datetime.fromisoformat(h["timestamp"].replace("Z", "+00:00")).astimezone(tz).date().isoformat()
+                hr_by_day.setdefault(d, []).append(h["bpm"])
+        chunk_start = chunk_end
 
     rows = []
     for i in range(days):
         d = (start + timedelta(days=i)).isoformat()
         n, r, a = nights.get(d, {}), readiness.get(d, {}), activity.get(d, {})
+        bpm = hr_by_day.get(d)
         rows.append({
             "day": d,
             "sleep_score": sleep_score.get(d),
             "sleep_time": n.get("total_sleep_duration"),
+            "sleep_hours": round(n["total_sleep_duration"] / 3600, 2) if n.get("total_sleep_duration") else None,
             "lowest_hr": n.get("lowest_heart_rate"),
             "hrv": n.get("average_hrv"),
             "readiness": r.get("score"),
-            "temp": r.get("temperature_deviation"),
+            "temp_dev": r.get("temperature_deviation"),
             "activity": a.get("score"),
             "steps": a.get("steps"),
+            "avg_hr": round(sum(bpm) / len(bpm)) if bpm else None,
+            "max_hr": max(bpm) if bpm else None,
         })
+    return start, end, rows
+
+
+def cmd_export(days, out):
+    """Write the daily rows as JSON (for the Sunday dashboard)."""
+    _, _, rows = _collect(days)
+    for r in rows:
+        r.pop("sleep_time", None)
+    with open(out, "w") as f:
+        json.dump({"rows": rows}, f, indent=1)
+    print(f"Wrote {len(rows)} days to {out}")
+
+
+def cmd_tokens_in(path):
+    """Load tokens saved on the dashboard (a JSON file of the stored document)."""
+    doc = _read(path) or {}
+    for key in ("data", "fields", "document"):
+        if isinstance(doc.get(key), dict) and "refresh_token" in doc[key]:
+            doc = doc[key]
+    if "refresh_token" not in doc:
+        sys.exit("NEED_LOGIN: no saved Oura login found in that file.")
+    _write_private(TOKENS, {k: doc[k] for k in
+                            ("access_token", "refresh_token", "expires_at", "token_type", "scope", "expires_in")
+                            if k in doc})
+    print("Oura login loaded.")
+
+
+def cmd_summary(days=7):
+    start, end, rows = _collect(days)
+    bpm_avg = _avg([x["avg_hr"] for x in rows])
+    bpm_max = max([x["max_hr"] for x in rows if x["max_hr"]], default=None)
 
     print(f"OURA - last {days} days ({start:%a %d %b} to {end:%a %d %b})\n")
     print(f"{'Day':<11}{'Sleep':>7}{'Slept':>8}{'Ready':>7}{'Active':>8}{'Steps':>8}{'Low HR':>8}{'HRV':>6}")
@@ -245,14 +297,14 @@ def cmd_summary(days=7):
     print(f"- Sleep: average score {s if s is not None else '-'} ({_word(s)}), about {_hm(st)} of sleep a night.")
     print(f"- Readiness: average {rd if rd is not None else '-'} ({_word(rd)}).")
     print(f"- Activity: average {ac if ac is not None else '-'} ({_word(ac)}), about {steps or '-'} steps a day.")
-    if bpm:
-        print(f"- Heart rate: {min(bpm)}-{max(bpm)} bpm over the week, average {round(sum(bpm)/len(bpm))} bpm.")
+    if bpm_avg:
+        print(f"- Heart rate: averaged {bpm_avg} bpm through the day, peaking at {bpm_max} bpm.")
     best = max((x for x in rows if x["readiness"] is not None), key=lambda x: x["readiness"], default=None)
     worst = min((x for x in rows if x["readiness"] is not None), key=lambda x: x["readiness"], default=None)
     if best and worst and best is not worst:
         print(f"- Best day: {datetime.fromisoformat(best['day']):%A} (readiness {best['readiness']}). "
               f"Toughest: {datetime.fromisoformat(worst['day']):%A} (readiness {worst['readiness']}).")
-    hot = [x for x in rows if x["temp"] is not None and x["temp"] >= 0.5]
+    hot = [x for x in rows if x["temp_dev"] is not None and x["temp_dev"] >= 0.5]
     if hot:
         print(f"- Body temperature ran higher than usual on {len(hot)} day(s) - worth watching.")
 
@@ -272,6 +324,11 @@ def main():
             print("Connected." if _read(TOKENS) else "Not connected.")
         elif cmd == "summary":
             cmd_summary(int(args[1]) if len(args) > 1 else 7)
+        elif cmd == "export":
+            cmd_export(int(args[1]) if len(args) > 1 else 30,
+                       args[2] if len(args) > 2 else "oura-30d.json")
+        elif cmd == "tokens-in" and len(args) == 2:
+            cmd_tokens_in(args[1])
         else:
             sys.exit(__doc__)
     except NeedLogin:

@@ -24,3 +24,12 @@ and Secret are still saved securely on the environment for cloud.ouraring.com).
 Never print, log or commit token values. Tokens live only in `~/.config/oura/`.
 If Oura returns a 401 on the token request, the Client ID/Secret saved on the
 environment may be wrong - tell Gaël to re-save them in the environment's network secrets.
+
+## Weekly dashboard
+
+Charts for 7, 14 and 30 days live at https://claude.ai/artifact/Gtvkabnx2xhJkyLj5KLR4e
+and refresh every Sunday evening (Bangkok time) from a scheduled task.
+The Oura login used by that task is stored privately on that page
+(`data/users/me`, doc `oura_auth`, readable only by Gaël's account).
+`python3 scripts/oura.py export 30 <file>` makes the data file;
+`python3 scripts/oura.py tokens-in <file>` loads a saved login.
