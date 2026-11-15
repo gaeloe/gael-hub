@@ -201,7 +201,9 @@ def _collect(days):
     tz = ZoneInfo(LOCAL_TZ)
     end = datetime.now(tz).date()
     start = end - timedelta(days=days - 1)
-    rng = {"start_date": start.isoformat(), "end_date": (end + timedelta(days=1)).isoformat()}
+    # Ask from the day before: Oura can leave out the first day of a range.
+    rng = {"start_date": (start - timedelta(days=1)).isoformat(),
+           "end_date": (end + timedelta(days=1)).isoformat()}
 
     sleep_score = {d["day"]: d.get("score") for d in _get("daily_sleep", rng)}
     readiness = {d["day"]: d for d in _get("daily_readiness", rng)}
