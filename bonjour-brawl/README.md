@@ -7,4 +7,4 @@ A friendly cartoon fighting game for kids aged 6–10 that teaches French while 
 - Deploy: `npx vercel deploy --prod` from this folder.
 - Progress is saved only in the browser (localStorage). No ads, no login, no tracking.
 
-Step 1 (this version): 2 fighters, 1 arena (Paris rooftops), 1 theme (colours), 4 challenge types, power meter, super move, stars.
+Full version: 8 fighters (3 costumes each), 4 arenas, 8 themes (70 words), arcade tower with a final boss, practice mode, stars, XP, daily streak, unlocks and a "My words" page.

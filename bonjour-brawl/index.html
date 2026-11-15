@@ -36,9 +36,13 @@
 
 <div id="title" class="screen see">
   <h1 class="logo"><span>Bonjour</span><span>Brawl</span></h1>
-  <p class="tagline">Fight with French power!</p>
-  <button id="playBtn" class="btn huge">▶ PLAY</button>
-  <div id="best" class="best"></div>
+  <div id="stats" class="stats"></div>
+  <button id="arcadeBtn" class="btn huge">🗼 Arcade Tower</button>
+  <div class="rowbtns">
+    <button id="practiceBtn" class="btn">🥋 Practice</button>
+    <button id="wordsBtn" class="btn">📖 My words</button>
+    <button id="fightersBtn" class="btn">👕 Fighters</button>
+  </div>
   <div class="rowbtns">
     <button id="soundBtn" class="btn small">🔊 Sound on</button>
     <button id="helpBtn" class="btn small">❓ How to play</button>
@@ -47,9 +51,25 @@
   <p id="micNote" class="fine hidden">Grown-ups: speaking challenges use your browser's speech recognition, which may send the microphone sound to the browser maker (Apple or Google). They are off unless you turn them on.</p>
 </div>
 
-<div id="select" class="screen hidden">
+<div id="tower" class="screen top hidden">
+  <h2 id="towerTitle">The Tower</h2>
+  <div id="floors" class="floors"></div>
+  <button class="btn small back" data-go="title">◀ Back</button>
+</div>
+
+<div id="select" class="screen top hidden">
   <h2>Pick your fighter!</h2>
   <div class="cards" id="cards"></div>
+  <div class="rowbtns" id="costumes"></div>
+  <div class="rowbtns sticky">
+    <button class="btn small back" data-go="title">◀ Back</button>
+    <button id="selGo" class="btn go">OK ▶</button>
+  </div>
+</div>
+
+<div id="words" class="screen top hidden">
+  <h2 id="wordsTitle">My words</h2>
+  <div id="wordsList" class="wordslist"></div>
   <button class="btn small back" data-go="title">◀ Back</button>
 </div>
 
@@ -69,10 +89,12 @@
   <h2 id="resTitle">You win!</h2>
   <div id="resStars" class="stars"></div>
   <p id="resLine" class="tagline"></p>
+  <div id="resUnlock" class="unlocks"></div>
   <div id="resWords" class="chips"></div>
   <div class="rowbtns">
+    <button id="nextBtn" class="btn huge">Next fight ▶</button>
     <button id="againBtn" class="btn huge">▶ Play again</button>
-    <button class="btn small" data-go="select">Change fighter</button>
+    <button class="btn small" data-go="title">🏠 Home</button>
   </div>
 </div>
 

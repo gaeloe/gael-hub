@@ -57,7 +57,7 @@ async function intro(word) {
 
 async function listenCh(ch) {
   const w = ch.word;
-  const { body, foot } = frame('Listen! Tap the right colour.', [['Listen! Tap the right colour.', 'en'], [w.fr, 'fr']]);
+  const { body, foot } = frame('Listen! Tap the right picture.', [['Listen! Tap the right picture.', 'en'], [w.fr, 'fr']]);
   const row = el('div', 'row');
   body.append(row);
   const picked = await new Promise((res) => {
@@ -80,7 +80,7 @@ async function listenCh(ch) {
 
 async function pickCh(ch) {
   const w = ch.word;
-  const { body, foot } = frame('What colour is this?', [['What colour is this? Tap a word to hear it.', 'en']]);
+  const { body, foot } = frame('What is this?', [['What is this? Tap a word to hear it.', 'en']]);
   const col = el('div', 'col');
   body.append(el('div', 'pic big', picSVG(w)), col);
   const go = el('button', 'btn go', '✓ OK');
@@ -116,7 +116,7 @@ async function sentenceCh(ch) {
   const col = el('div', 'col wide');
   const slots = el('div', 'slots'), bank = el('div', 'bank');
   col.append(el('div', 'en-small', '“' + s.en + '”'), slots, bank);
-  body.append(el('div', 'pic mid', picSVG(w, 'balloon')), col);
+  body.append(el('div', 'pic mid', picSVG(w, true)), col);
   const go = el('button', 'btn go', '✓ OK');
   go.disabled = true;
   foot.append(go);
@@ -181,7 +181,7 @@ async function micCh(ch) {
     const r = await listenOnce();
     go.disabled = false; go.classList.remove('listening');
     if (r.error && r.error !== 'no-speech' && r.error !== 'aborted') { mic.broken = true; return 'fallback'; }
-    if (r.alts && r.alts.some((a) => strip(a).split(/\s+/).some((x) => w.alts.includes(x)))) {
+    if (r.alts && r.alts.some((a) => w.alts.some((x) => strip(a).includes(x)))) {
       await feedback(true, w, foot, w.fr);
       return { correct: true };
     }

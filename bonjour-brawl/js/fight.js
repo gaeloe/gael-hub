@@ -10,15 +10,16 @@ const ATK = {
 const POW = ['PAF!', 'BOUM!', 'VLAN!', 'BING!', 'TOC!'];
 const rnd = Math.random;
 
-function mk(char, x, face, isPlayer) {
-  return { char, x, y: GROUND, vx: 0, vy: 0, kbv: 0, face, hp: 100, dispHp: 100, state: 'idle', st: 0, atk: null, inv: 0, air: false, blocking: false, isPlayer, wins: 0, hist: [], seed: isPlayer ? 0 : 2 };
+function mk(char, x, face, isPlayer, pal, maxHp = 100) {
+  return { pal, maxHp, char, x, y: GROUND, vx: 0, vy: 0, kbv: 0, face, hp: maxHp, dispHp: maxHp, state: 'idle', st: 0, atk: null, inv: 0, air: false, blocking: false, isPlayer, wins: 0, hist: [], seed: isPlayer ? 0 : 2 };
 }
 
 export class Fight {
   constructor(o) {
     this.o = o;
-    this.player = mk(o.playerChar, 300, 1, true);
-    this.cpu = mk(o.cpuChar, 660, -1, false);
+    this.player = mk(o.playerChar, 300, 1, true, o.playerPal);
+    this.cpu = mk(o.cpuChar, 660, -1, false, o.cpuPal, o.cpuHp || 100);
+    this.d = o.diff || { cd0: 1.0, cd1: 1.1, block: 0.3, dmg: 0.8, speed: 0.8 };
     this.time = 0; this.t = 0; this.round = 1;
     this.meter = 0; this.dispMeter = 0; this.superWord = null;
     this.chalT = 4; this.fx = []; this.parts = []; this.banner = null; this.shake = 0; this.sup = null; this.buf = null;
@@ -29,8 +30,8 @@ export class Fight {
 
   startIntro() {
     this.mode = 'intro'; this.t = 0; this.said = false;
-    this.banner = { text: 'Round ' + this.round, t: 0, life: 1.1 };
-    say([['Round ' + ['one', 'two', 'three'][this.round - 1] + '!', 'en'], ['Allez !', 'fr']]);
+    this.banner = { text: 'Round ' + this.round, t: 0, life: 1.1, sub: this.round === 1 ? this.o.sub : null };
+    say([...(this.round === 1 && this.o.intro ? this.o.intro : []), ['Round ' + ['one', 'two', 'three'][this.round - 1] + '!', 'en'], ['Allez !', 'fr']]);
   }
 
   press(a) {
@@ -104,7 +105,7 @@ export class Fight {
     this.round++;
     const p = this.player, c = this.cpu;
     Object.assign(p, { x: 300, y: GROUND, vx: 0, vy: 0, kbv: 0, hp: 100, state: 'idle', atk: null, inv: 0, face: 1, hist: [] });
-    Object.assign(c, { x: 660, y: GROUND, vx: 0, vy: 0, kbv: 0, hp: 100, state: 'idle', atk: null, inv: 0, face: -1, hist: [] });
+    Object.assign(c, { x: 660, y: GROUND, vx: 0, vy: 0, kbv: 0, hp: c.maxHp, state: 'idle', atk: null, inv: 0, face: -1, hist: [] });
     this.fx = []; this.chalT = Math.min(this.chalT, 3); this.startIntro();
   }
 
@@ -132,10 +133,10 @@ export class Fight {
       else if (dist < 84) a.move = rnd() < 0.5 ? -dir : 0;
       else a.move = rnd() < 0.2 ? -dir : 0;
       a.jump = rnd() < 0.05;
-      if (p.atk && dist < 160 && rnd() < 0.3) a.blockT = 0.5;
+      if (p.atk && dist < 160 && rnd() < this.d.block) a.blockT = 0.5;
     }
     it.move = a.move; it.jump = a.jump; a.jump = false;
-    if (dist < 128 && a.cd <= 0) { it[rnd() < 0.6 ? 'punch' : 'kick'] = true; a.cd = 1.0 + rnd() * 1.1; }
+    if (dist < 128 && a.cd <= 0) { it[rnd() < 0.6 ? 'punch' : 'kick'] = true; a.cd = this.d.cd0 + rnd() * this.d.cd1; }
     return it;
   }
 
@@ -161,7 +162,7 @@ export class Fight {
       if (it.punch) this.startAtk(f, 'punch'); else if (it.kick) this.startAtk(f, 'kick');
     }
     if (f.state === 'idle' && !f.atk && !f.blocking) {
-      f.vx = (it.move || 0) * SPEED * (f.isPlayer ? 1 : 0.8);
+      f.vx = (it.move || 0) * SPEED * (f.isPlayer ? 1 : this.d.speed);
       if (it.jump && !f.air) { f.vy = -JUMP; f.air = true; sfx.jump(); }
     } else if (!f.air) f.vx *= Math.pow(0.001, dt);
     f.vy += GRAV * dt; f.y += f.vy * dt;
@@ -179,7 +180,7 @@ export class Fight {
     if (dx < -20 || dx > sp.reach || Math.abs(d.y - a.y) > 115 || d.inv > 0) return;
     a.atk.hit = true;
     const fin = a.atk.finisher;
-    let dmg = sp.dmg * (fin ? 2.4 : 1) * (a.air ? 1.3 : 1) * (a.isPlayer ? 1 : 0.8);
+    let dmg = sp.dmg * (fin ? 2.4 : 1) * (a.air ? 1.3 : 1) * (a.isPlayer ? 1 : this.d.dmg);
     const hx = (a.x + d.x) / 2 + a.face * 14, hy = d.y - 92;
     a.hist.push({ type: a.atk.type, t: this.time });
     if (d.blocking && d.face === -a.face && !fin) {
@@ -262,7 +263,7 @@ export class Fight {
     const p = this.player, c = this.cpu;
     ctx.save();
     if (this.shake > 0) ctx.translate((rnd() - 0.5) * this.shake, (rnd() - 0.5) * this.shake);
-    drawArena(ctx, this.time);
+    drawArena(ctx, this.time, this.o.arena);
     const s = this.sup;
     if (s) {
       ctx.fillStyle = 'rgba(20,16,60,.5)'; ctx.fillRect(-20, -20, W + 40, H + 40);
@@ -281,6 +282,7 @@ export class Fight {
       const b = s.ball, pul = 1 + Math.sin(this.time * 30) * 0.12;
       burst(ctx, b.x, b.y, 46 * pul, this.time * 8, s.word.hex, 9);
       ctx.beginPath(); ctx.arc(b.x, b.y, 16, 0, 7); ctx.fillStyle = s.word.id === 'blanc' ? '#ffe98a' : '#fff'; ctx.fill();
+      if (s.word.emoji) txt(ctx, s.word.emoji, b.x, b.y + 2, 34, { stroke: null });
     }
     for (const q of this.parts) { ctx.globalAlpha = Math.max(0, 1 - q.t / q.life); star(ctx, q.x, q.y, q.r, q.t * 9, q.color, 2); }
     ctx.globalAlpha = 1;
@@ -294,7 +296,7 @@ export class Fight {
     }
     if (s) {
       const k = Math.min(1, s.t * 3), w = s.word.fr.toUpperCase() + '!';
-      const sz = 120 * (0.4 + 0.6 * k) * (1 + Math.sin(this.time * 18) * 0.03);
+      const sz = 120 * Math.min(1, 8 / w.length) * (0.4 + 0.6 * k) * (1 + Math.sin(this.time * 18) * 0.03);
       txt(ctx, w, W / 2, 255, sz, { fill: s.word.hex, stroke: '#fff', lw: 22 });
       txt(ctx, w, W / 2, 255, sz, { fill: s.word.hex, stroke: OUT, lw: 8 });
       txt(ctx, '⚡ SUPER MOVE ⚡', W / 2, 162, 34, { fill: '#ffd21f' });
@@ -311,7 +313,7 @@ export class Fight {
   drawHUD(ctx) {
     const p = this.player, c = this.cpu;
     const bar = (x, f, flip) => {
-      const w = 380, h = 30, y = 22, k = Math.max(0, f.dispHp / 100);
+      const w = 380, h = 30, y = 22, k = Math.max(0, f.dispHp / f.maxHp);
       rrect(ctx, x, y, w, h, 12); ctx.fillStyle = '#3a2f55'; ctx.fill();
       ctx.save(); rrect(ctx, x, y, w, h, 12); ctx.clip();
       ctx.fillStyle = k > 0.5 ? '#4cd964' : k > 0.25 ? '#ffc93c' : '#ff6b5e';
