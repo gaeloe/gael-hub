@@ -217,6 +217,8 @@ def _collect(days):
         cur = nights.get(s["day"])
         if not cur or (s.get("total_sleep_duration") or 0) > (cur.get("total_sleep_duration") or 0):
             nights[s["day"]] = s
+    # A "night" under an hour is a blip (ring briefly on), not a night's sleep.
+    nights = {d: n for d, n in nights.items() if (n.get("total_sleep_duration") or 0) >= 3600}
 
     # Heart-rate samples, averaged per local day (Oura allows at most 30 days per call).
     hr_by_day = {}
